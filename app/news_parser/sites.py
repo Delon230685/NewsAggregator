@@ -14,7 +14,7 @@ class SiteParser:
             feed = feedparser.parse(url)
             news_items = []
 
-            for entry in feed.entries[:10]:  # Берем последние 10
+            for entry in feed.entries[:10]:
                 title = entry.get('title', '')
                 summary = entry.get('summary', '') or entry.get('description', '')
                 link = entry.get('link', '')
@@ -25,13 +25,12 @@ class SiteParser:
                 else:
                     published_at = datetime.utcnow()
 
-                # Создаем хеш для дедупликации
                 hash_key = hashlib.sha256(f"{title}{link}".encode()).hexdigest()
 
                 news_items.append({
                     'title': title,
                     'url': link,
-                    'summary': summary[:500],  # Ограничиваем длину
+                    'summary': summary[:500],
                     'source': url,
                     'published_at': published_at,
                     'raw_text': summary,
@@ -50,7 +49,6 @@ class SiteParser:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            # Ищем типичные элементы новостей
             news_items = []
             articles = soup.find_all(['article', '.news-item', '.post'], limit=10)
 

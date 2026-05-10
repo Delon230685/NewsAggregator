@@ -10,14 +10,12 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-# Настройка Celery
 celery_app = Celery(
     'tasks',
     broker=config.CELERY_BROKER_URL,
     backend=config.CELERY_RESULT_BACKEND
 )
 
-# Конфигурация Celery
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -25,27 +23,26 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=30 * 60,  # 30 минут
-    task_soft_time_limit=25 * 60,  # 25 минут
+    task_time_limit=30 * 60,
+    task_soft_time_limit=25 * 60,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
 
-    # Расписание задач
     beat_schedule={
         'parse-lenta-every-30-minutes': {
             'task': 'app.tasks.parse_lenta_by_keywords',
-            'schedule': 1800.0,  # Каждые 30 минут (1800 секунд)
+            'schedule': 1800.0,
             'options': {
-                'expires': 300.0  # Задача устаревает через 5 минут
+                'expires': 300.0
             }
         },
         'generate-posts-every-10-minutes': {
             'task': 'app.tasks.generate_posts_for_news',
-            'schedule': 600.0,  # Каждые 10 минут
+            'schedule': 600.0,
         },
         'cleanup-old-logs-daily': {
             'task': 'app.tasks.cleanup_old_logs',
-            'schedule': crontab(hour=0, minute=0),  # Каждый день в полночь
+            'schedule': crontab(hour=0, minute=0),
         },
     }
 )
@@ -58,17 +55,14 @@ def parse_lenta_by_keywords(self):
     try:
         logger.info("Starting Lenta.ru parsing by keywords")
 
-        # Проверяем наличие ключевых слов
         keywords_count = session.query(Keyword).filter(Keyword.is_active == True).count()
         if keywords_count == 0:
             logger.warning("No active keywords found. Please add keywords first.")
             return {"status": "warning", "message": "No active keywords found"}
 
-        # Парсим новости
         parser = LentaParser()
         news_filter = NewsFilter(session)
 
-        # Получаем все новости
         all_news = parser.parse_rss()
 
         if not all_news:
@@ -77,14 +71,11 @@ def parse_lenta_by_keywords(self):
 
         logger.info(f"Parsed {len(all_news)} news from Lenta.ru")
 
-        # Фильтруем по ключевым словам
         filtered_news = news_filter.filter_by_keywords(all_news)
         logger.info(f"Filtered {len(filtered_news)} news by keywords")
 
-        # Сохраняем в базу
         new_news_count = 0
         for news in filtered_news:
-            # Проверяем, нет ли уже такой новости
             existing = session.query(NewsItem).filter(
                 NewsItem.hash_key == news['hash_key']
             ).first()
@@ -96,7 +87,6 @@ def parse_lenta_by_keywords(self):
 
         session.commit()
 
-        # Логируем результат
         log = ParsingLog(
             source_id=None,
             status="completed",
@@ -109,7 +99,6 @@ def parse_lenta_by_keywords(self):
 
         logger.info(f"Saved {new_news_count} new news from Lenta.ru")
 
-        # Запускаем генерацию постов для новых новостей
         if new_news_count > 0:
             generate_posts_for_news.delay()
 
@@ -125,7 +114,6 @@ def parse_lenta_by_keywords(self):
         logger.error(f"Error parsing Lenta.ru: {e}")
         session.rollback()
 
-        # Логируем ошибку
         log = ParsingLog(
             source_id=None,
             status="failed",
@@ -134,9 +122,8 @@ def parse_lenta_by_keywords(self):
         session.add(log)
         session.commit()
 
-        # Повторная попытка при ошибке
         try:
-            self.retry(countdown=60 * 5)  # Повторить через 5 минут
+            self.retry(countdown=60 * 5)
         except Exception as retry_error:
             logger.error(f"Retry failed: {retry_error}")
 
@@ -153,7 +140,6 @@ def generate_posts_for_news(self):
     try:
         from app.ai.generator import ai_generator
 
-        # Находим новости без постов
         news_without_posts = session.query(NewsItem).outerjoin(
             Post, NewsItem.id == Post.news_id
         ).filter(Post.id == None).limit(10).all()
@@ -169,7 +155,6 @@ def generate_posts_for_news(self):
 
         for news in news_without_posts:
             try:
-                # Генерируем пост
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 generated_text = loop.run_until_complete(
@@ -194,7 +179,6 @@ def generate_posts_for_news(self):
                 failed_count += 1
                 logger.error(f"Error generating post for news {news.id}: {e}")
 
-                # Создаем запись о неудачной генерации
                 post = Post(
                     news_id=news.id,
                     generated_text=f"❌ Ошибка генерации: {str(e)}",
@@ -216,9 +200,8 @@ def generate_posts_for_news(self):
         logger.error(f"Error in generate_posts_for_news: {e}")
         session.rollback()
 
-        # Повторная попытка при ошибке
         try:
-            self.retry(countdown=60 * 2)  # Повторить через 2 минуты
+            self.retry(countdown=60 * 2)
         except Exception as retry_error:
             logger.error(f"Retry failed: {retry_error}")
 
@@ -243,7 +226,6 @@ def parse_all_sources():
             if source.type == 'site' and 'lenta' in source.url.lower():
                 task = parse_lenta_by_keywords.delay()
                 tasks.append(task.id)
-            # Здесь можно добавить другие источники
 
         logger.info(f"Started parsing for {len(tasks)} sources")
         return {"status": "started", "tasks": tasks}
@@ -264,12 +246,10 @@ def cleanup_old_logs():
 
         cutoff_date = datetime.utcnow() - timedelta(days=30)
 
-        # Удаляем старые логи парсинга
         old_parsing_logs = session.query(ParsingLog).filter(
             ParsingLog.created_at < cutoff_date
         ).delete()
 
-        # Удаляем старые посты со статусом FAILED
         old_failed_posts = session.query(Post).filter(
             Post.status == PostStatus.FAILED,
             Post.created_at < cutoff_date
@@ -301,3 +281,55 @@ def test_celery():
         "message": "Celery is working correctly",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@celery_app.task(bind=True, max_retries=3)
+def publish_post_task(self, post_id: str):
+    """Публикация поста в Telegram"""
+    from app.telegram.publisher import telegram_publisher
+    import asyncio
+
+    session = db.get_session()
+    try:
+        post = session.query(Post).filter(Post.id == post_id).first()
+        if not post:
+            logger.error(f"Post {post_id} not found")
+            return {"status": "error", "message": "Post not found"}
+
+        if post.status == PostStatus.PUBLISHED:
+            logger.info(f"Post {post_id} already published")
+            return {"status": "skipped", "message": "Already published"}
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        success = loop.run_until_complete(
+            telegram_publisher.publish_post(post.generated_text, config.TELEGRAM_CHANNEL_ID)
+        )
+        loop.close()
+
+        if success:
+            post.status = PostStatus.PUBLISHED
+            post.published_at = datetime.utcnow()
+            session.commit()
+            logger.info(f"Successfully published post {post_id}")
+            return {"status": "success", "message": "Post published"}
+        else:
+            post.status = PostStatus.FAILED
+            post.error_message = "Failed to publish to Telegram"
+            session.commit()
+            return {"status": "error", "message": "Publishing failed"}
+
+    except Exception as e:
+        logger.error(f"Error publishing post {post_id}: {e}")
+        if session:
+            session.rollback()
+
+        try:
+            self.retry(countdown=60, max_retries=3)
+        except Exception:
+            pass
+
+        return {"status": "error", "message": str(e)}
+    finally:
+        if session:
+            session.close()

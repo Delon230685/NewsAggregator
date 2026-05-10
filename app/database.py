@@ -2,12 +2,10 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import config
 from app.models import Base
-import json
 
 
 class Database:
     def __init__(self):
-        # Для SQLite нужно добавить это
         if 'sqlite' in config.DATABASE_URL:
             self.engine = create_engine(
                 config.DATABASE_URL,
@@ -21,7 +19,6 @@ class Database:
 
     def create_tables(self):
         """Создание таблиц, если они не существуют"""
-        # Проверяем существование таблиц
         inspector = inspect(self.engine)
         if not inspector.get_table_names():
             Base.metadata.create_all(bind=self.engine)

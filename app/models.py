@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Text, Enum, Integer, ForeignKey, Index
+from sqlalchemy import Column, String, DateTime, Boolean, Text, Enum, Integer, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -10,10 +10,8 @@ import sys
 Base = declarative_base()
 
 
-# Функция для получения UUID в зависимости от БД
 def get_uuid_column():
     """Возвращает подходящий тип для UUID в зависимости от БД"""
-    # Для SQLite используем String, для PostgreSQL - UUID
     if 'sqlite' in sys.argv or 'sqlite' in str(sys.argv):
         return Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     else:
@@ -54,7 +52,6 @@ class NewsItem(Base):
     relevance_score = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Отношения
     posts = relationship("Post", back_populates="news", cascade="all, delete-orphan")
 
     __table_args__ = (

@@ -14,7 +14,6 @@ class TelegramPublisher:
 
             channel = await self.client.get_entity(channel_id)
 
-            # Проверяем длину сообщения
             if len(text) > 4096:
                 text = text[:4093] + "..."
 
@@ -30,7 +29,6 @@ class TelegramPublisher:
 
     async def check_if_published(self, news_hash: str) -> bool:
         """Проверка, не опубликован ли уже пост"""
-        # Здесь можно хранить хеши опубликованных постов в Redis
         return False
 
 

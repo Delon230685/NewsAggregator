@@ -1,18 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import NewsItem, Post, Source, Keyword, PostStatus, SourceType
 
-# ============ СОЗДАЕМ РОУТЕР ============
 router = APIRouter(prefix="/api", tags=["API"])
 
 
-# ============ Схемы для эндпоинтов ============
 class SourceCreate(BaseModel):
     type: SourceType
     name: str
@@ -78,7 +76,6 @@ class GenerateResponse(BaseModel):
     generated_text: str
 
 
-# ============ Sources endpoints ============
 @router.get("/sources/", response_model=List[SourceResponse])
 def get_sources(db: Session = Depends(get_db)):
     """Получить все источники новостей"""
@@ -133,7 +130,6 @@ def parse_source_now(source_id: UUID, db: Session = Depends(get_db)):
     return {"message": f"Parsing started for source: {source.name}"}
 
 
-# ============ Keywords endpoints ============
 @router.get("/keywords/", response_model=List[KeywordResponse])
 def get_keywords(db: Session = Depends(get_db)):
     """Получить все ключевые слова для фильтрации"""
@@ -156,15 +152,16 @@ def create_keyword(keyword: KeywordCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/keywords/{keyword_id}")
-def delete_keyword(keyword_id: UUID, db: Session = Depends(get_db)):
+def delete_keyword(keyword_id: str, db: Session = Depends(get_db)):
     """Удалить ключевое слово"""
     db_keyword = db.query(Keyword).filter(Keyword.id == keyword_id).first()
+
     if not db_keyword:
         raise HTTPException(status_code=404, detail="Keyword not found")
 
     db.delete(db_keyword)
     db.commit()
-    return {"message": "Keyword deleted successfully"}
+    return {"message": f"Keyword '{db_keyword.word}' deleted successfully"}
 
 
 @router.put("/keywords/{keyword_id}/toggle")
@@ -204,7 +201,6 @@ def add_keywords_bulk(keywords: List[str], db: Session = Depends(get_db)):
     }
 
 
-# ============ News endpoints ============
 @router.get("/news/", response_model=List[NewsItemResponse])
 def get_news(skip: int = 0, limit: int = 100, source: Optional[str] = None, db: Session = Depends(get_db)):
     """Получить список новостей с фильтрацией"""
@@ -261,7 +257,6 @@ def generate_post_for_news(news_id: str, db: Session = Depends(get_db)):
     if not news:
         raise HTTPException(status_code=404, detail="News not found")
 
-    # Простая генерация без AI для теста
     generated_text = f"""
 🔥 {news.title}
 
@@ -283,7 +278,6 @@ def generate_post_for_news(news_id: str, db: Session = Depends(get_db)):
     return {"message": "Post generated", "post_id": str(post.id)}
 
 
-# ============ Posts endpoints ============
 @router.get("/posts/", response_model=List[PostResponse])
 def get_posts(skip: int = 0, limit: int = 100, status: Optional[PostStatus] = None, db: Session = Depends(get_db)):
     """Получить список сгенерированных постов"""
@@ -334,7 +328,6 @@ def delete_post(post_id: str, db: Session = Depends(get_db)):
     return {"message": "Post deleted successfully"}
 
 
-# ============ Generate endpoint ============
 @router.post("/generate/", response_model=GenerateResponse)
 async def generate_manually(request: GenerateRequest):
     """Ручная генерация поста через AI"""
@@ -354,7 +347,6 @@ async def generate_manually(request: GenerateRequest):
         return GenerateResponse(generated_text=f"❌ Ошибка генерации: {str(e)}")
 
 
-# ============ Parse endpoints ============
 @router.post("/parse/lenta")
 def parse_lenta_now(db: Session = Depends(get_db)):
     """Запустить парсинг Lenta.ru прямо сейчас"""
@@ -395,7 +387,6 @@ def parse_lenta_now(db: Session = Depends(get_db)):
         return {"status": "error", "message": str(e)}
 
 
-# ============ Stats endpoint ============
 @router.get("/stats/")
 def get_stats(db: Session = Depends(get_db)):
     """Получить статистику системы"""
@@ -428,13 +419,10 @@ def get_stats(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-
-# ============ Health endpoint ============
 @router.get("/health")
 def health_check(db: Session = Depends(get_db)):
     """Проверка работоспособности API"""
     try:
-        # Для SQLite используем другой запрос
         from sqlalchemy import text
         db.execute(text("SELECT 1"))
         db_status = "healthy"
@@ -449,7 +437,6 @@ def health_check(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# ============ Dashboard endpoint ============
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db)):
     """Получить сводку для дашборда"""

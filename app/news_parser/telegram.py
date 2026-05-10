@@ -22,7 +22,6 @@ class TelegramParser:
         try:
             channel = await self.client.get_entity(channel_username)
 
-            # Получаем сообщения за последние 6 часов
             since = datetime.utcnow() - timedelta(hours=6)
 
             async for message in self.client.iter_messages(channel, limit=limit):
@@ -30,7 +29,7 @@ class TelegramParser:
                     break
 
                 if message.text:
-                    title = message.text[:100]  # Первые 100 символов как заголовок
+                    title = message.text[:100]
 
                     hash_key = hashlib.sha256(f"{message.id}{channel_username}".encode()).hexdigest()
 

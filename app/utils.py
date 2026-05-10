@@ -1,7 +1,7 @@
 import hashlib
 import re
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from datetime import datetime
+from typing import Dict, Any, List
 import json
 import logging
 from functools import wraps
@@ -11,37 +11,27 @@ logger = logging.getLogger(__name__)
 
 
 def generate_hash(text: str, max_length: int = 64) -> str:
-    """
-    Генерация хеша для строки (используется для дедупликации)
-    """
+    """Генерация хеша для строки (используется для дедупликации)"""
     return hashlib.sha256(text.encode('utf-8')).hexdigest()[:max_length]
 
 
 def clean_text(text: str) -> str:
-    """
-    Очистка текста от лишних пробелов, переносов и спецсимволов
-    """
+    """Очистка текста от лишних пробелов, переносов и спецсимволов"""
     if not text:
         return ""
 
-    # Удаляем лишние пробелы
     text = re.sub(r'\s+', ' ', text)
-    # Удаляем HTML теги
     text = re.sub(r'<[^>]+>', '', text)
-    # Удаляем спецсимволы (оставляем буквы, цифры, пробелы и базовую пунктуацию)
     text = re.sub(r'[^\w\s.,!?;:()-]', '', text)
 
     return text.strip()
 
 
 def truncate_text(text: str, max_length: int = 500, suffix: str = "...") -> str:
-    """
-    Обрезание текста до указанной длины
-    """
+    """Обрезание текста до указанной длины"""
     if len(text) <= max_length:
         return text
 
-    # Обрезаем по словам
     truncated = text[:max_length - len(suffix)]
     last_space = truncated.rfind(' ')
 
@@ -52,9 +42,7 @@ def truncate_text(text: str, max_length: int = 500, suffix: str = "...") -> str:
 
 
 def extract_keywords(text: str, top_n: int = 5) -> List[str]:
-    """
-    Извлечение ключевых слов из текста (простая реализация)
-    """
+    """Извлечение ключевых слов из текста (простая реализация)"""
     # Стоп-слова
     stop_words = {'и', 'в', 'на', 'с', 'по', 'к', 'у', 'из', 'за', 'о', 'об',
                   'для', 'от', 'до', 'без', 'через', 'над', 'под', 'это', 'эта',
@@ -62,31 +50,24 @@ def extract_keywords(text: str, top_n: int = 5) -> List[str]:
                   'где', 'когда', 'тогда', 'затем', 'потом', 'или', 'но', 'да',
                   'нет', 'не', 'ни', 'и', 'же', 'ли', 'а', 'то', 'при', 'со'}
 
-    # Токенизация и фильтрация
     words = re.findall(r'\b[а-яa-z]{3,}\b', text.lower())
     words = [w for w in words if w not in stop_words]
 
-    # Подсчет частоты
     freq = {}
     for word in words:
         freq[word] = freq.get(word, 0) + 1
 
-    # Сортировка и возврат топ-N
     sorted_words = sorted(freq.items(), key=lambda x: x[1], reverse=True)
     return [word for word, count in sorted_words[:top_n]]
 
 
 def is_duplicate(existing_hashes: List[str], new_hash: str) -> bool:
-    """
-    Проверка на дубликат по хешу
-    """
+    """Проверка на дубликат по хешу"""
     return new_hash in existing_hashes
 
 
 def format_datetime(dt: datetime, format_type: str = "full") -> str:
-    """
-    Форматирование даты/времени для разных нужд
-    """
+    """Форматирование даты/времени для разных нужд"""
     if format_type == "full":
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     elif format_type == "date":
@@ -100,9 +81,7 @@ def format_datetime(dt: datetime, format_type: str = "full") -> str:
 
 
 def get_relative_time(dt: datetime) -> str:
-    """
-    Получение относительного времени (например, "2 часа назад")
-    """
+    """Получение относительного времени (например, "2 часа назад")"""
     now = datetime.utcnow()
     diff = now - dt
 
@@ -122,9 +101,7 @@ def get_relative_time(dt: datetime) -> str:
 
 
 def retry_on_failure(max_retries: int = 3, delay: int = 1, backoff: int = 2):
-    """
-    Декоратор для повторных попыток при ошибках
-    """
+    """Декоратор для повторных попыток при ошибках"""
 
     def decorator(func):
         @wraps(func)
@@ -153,9 +130,7 @@ def retry_on_failure(max_retries: int = 3, delay: int = 1, backoff: int = 2):
 
 
 class RateLimiter:
-    """
-    Простой rate limiter для API
-    """
+    """Простой rate limiter для API"""
 
     def __init__(self, max_calls: int = 10, time_window: int = 60):
         self.max_calls = max_calls
@@ -163,12 +138,9 @@ class RateLimiter:
         self.calls = []
 
     def can_call(self) -> bool:
-        """
-        Проверка, можно ли выполнить вызов
-        """
+        """Проверка, можно ли выполнить вызов"""
         now = time.time()
 
-        # Очищаем старые вызовы
         self.calls = [call for call in self.calls if now - call < self.time_window]
 
         if len(self.calls) < self.max_calls:
@@ -178,9 +150,7 @@ class RateLimiter:
         return False
 
     def wait_time(self) -> float:
-        """
-        Время ожидания до следующего доступного вызова
-        """
+        """Время ожидания до следующего доступного вызова"""
         if not self.calls:
             return 0
 
@@ -192,35 +162,27 @@ class RateLimiter:
 
 
 class JSONSerializer:
-    """
-    Сериализатор для JSON с поддержкой datetime и UUID
-    """
+    """Сериализатор для JSON с поддержкой datetime и UUID"""
 
     @staticmethod
     def serialize(obj: Any) -> str:
-        """
-        Сериализация объекта в JSON
-        """
+        """Сериализация объекта в JSON"""
         return json.dumps(obj, default=str, ensure_ascii=False)
 
     @staticmethod
     def deserialize(json_str: str) -> Any:
-        """
-        Десериализация JSON в объект
-        """
+        """Десериализация JSON в объект"""
         return json.loads(json_str)
 
 
 def validate_url(url: str) -> bool:
-    """
-    Валидация URL
-    """
+    """Валидация URL"""
     pattern = re.compile(
         r'^https?://'  # http:// или https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # домен...
-        r'localhost|'  # localhost...
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...или IP
-        r'(?::\d+)?'  # опциональный порт
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'
+        r'localhost|'
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
+        r'(?::\d+)?'
         r'(?:/?|[/?]\S+)$', re.IGNORECASE
     )
 
@@ -228,9 +190,7 @@ def validate_url(url: str) -> bool:
 
 
 def safe_get(data: Dict, path: str, default: Any = None) -> Any:
-    """
-    Безопасное получение значения из вложенного словаря
-    """
+    """Безопасное получение значения из вложенного словаря"""
     keys = path.split('.')
     current = data
 
@@ -247,16 +207,12 @@ def safe_get(data: Dict, path: str, default: Any = None) -> Any:
 
 
 def chunk_list(lst: List, chunk_size: int = 10) -> List[List]:
-    """
-    Разбиение списка на чанки
-    """
+    """Разбиение списка на чанки"""
     return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
 class MetricsCollector:
-    """
-    Сбор метрик для мониторинга
-    """
+    """Сбор метрик для мониторинга"""
 
     def __init__(self):
         self.metrics = {
@@ -269,27 +225,20 @@ class MetricsCollector:
         }
 
     def increment(self, metric_name: str, value: int = 1):
-        """
-        Увеличение метрики
-        """
+        """Увеличение метрики"""
         if metric_name in self.metrics:
             self.metrics[metric_name] += value
 
     def get_metrics(self) -> Dict:
-        """
-        Получение всех метрик
-        """
+        """Получение всех метрик"""
         return self.metrics.copy()
 
     def reset(self):
-        """
-        Сброс всех метрик
-        """
+        """Сброс всех метрик"""
         for key in self.metrics:
             self.metrics[key] = 0
 
 
-# Глобальные экземпляры
 rate_limiter = RateLimiter(max_calls=30, time_window=60)
 metrics_collector = MetricsCollector()
 json_serializer = JSONSerializer()

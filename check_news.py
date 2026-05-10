@@ -1,7 +1,5 @@
 import requests
-import json
 
-# Получить список новостей
 response = requests.get('http://localhost:8000/api/news/')
 news = response.json()
 

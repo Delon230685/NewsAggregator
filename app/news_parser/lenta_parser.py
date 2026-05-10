@@ -1,5 +1,3 @@
-import requests
-from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import List, Dict
 import hashlib
@@ -16,7 +14,7 @@ class LentaParser:
         self.base_url = "https://lenta.ru"
         self.rss_url = "https://lenta.ru/rss"
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (HTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
     def parse_rss(self) -> List[Dict]:
@@ -26,18 +24,14 @@ class LentaParser:
             feed = feedparser.parse(self.rss_url)
             news_items = []
 
-            for entry in feed.entries[:30]:  # Берем последние 30 новостей
-                # Извлекаем текст из описания
+            for entry in feed.entries[:30]:
                 summary = entry.get('summary', '')
-                # Очищаем от HTML тегов
                 summary = re.sub(r'<[^>]+>', '', summary)
 
-                # Парсим дату
                 published_at = datetime.utcnow()
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     published_at = datetime(*entry.published_parsed[:6])
 
-                # Создаем хеш для дедупликации
                 hash_key = hashlib.md5(f"{entry.title}{entry.link}".encode()).hexdigest()
 
                 news_items.append({
@@ -63,7 +57,6 @@ class LentaParser:
         filtered_news = []
 
         for news in all_news:
-            # Проверяем наличие ключевых слов в заголовке и тексте
             text_to_check = (news['title'] + " " + news['summary']).lower()
 
             for keyword in keywords:
@@ -85,7 +78,6 @@ class NewsFilter:
         """Фильтрация новостей по ключевым словам из БД"""
         from app.models import Keyword
 
-        # Получаем активные ключевые слова из БД
         keywords = self.db_session.query(Keyword).filter(
             Keyword.is_active == True
         ).all()
@@ -119,5 +111,4 @@ class NewsFilter:
                 # За каждое вхождение +20 баллов
                 total_score += 20
 
-        # Ограничиваем 100
         return min(total_score, 100)

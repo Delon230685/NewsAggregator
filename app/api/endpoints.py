@@ -1,19 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from uuid import UUID
-
 from app.database import get_db
-from app.models import NewsItem, Post, Source, Keyword, PostStatus
+from app.models import NewsItem, Post, Source, Keyword
 from app.api.schemas import *
-# from app.tasks import generate_post_for_news_task, parse_source_task  # Временно закомментировать
 from app.ai.generator import ai_generator
-import asyncio
 
 router = APIRouter(prefix="/api", tags=["API"])
 
 
-# Sources endpoints
 @router.get("/sources/", response_model=List[SourceResponse])
 def get_sources(db: Session = Depends(get_db)):
     sources = db.query(Source).all()
@@ -102,7 +97,6 @@ def get_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 @router.post("/posts/{post_id}/publish")
 def publish_post_manually(post_id: UUID, db: Session = Depends(get_db)):
     """Ручная публикация поста"""
-    # from app.tasks import publish_post_task  # Временно закомментировать
 
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
@@ -111,7 +105,6 @@ def publish_post_manually(post_id: UUID, db: Session = Depends(get_db)):
     if post.status == PostStatus.PUBLISHED:
         raise HTTPException(status_code=400, detail="Post already published")
 
-    # publish_post_task.delay(str(post_id))  # Временно закомментировать
     return {"message": "Publishing started (simulated - Celery disabled for testing)"}
 
 
@@ -141,7 +134,6 @@ def generate_post_for_news(news_id: UUID, db: Session = Depends(get_db)):
     if not news:
         raise HTTPException(status_code=404, detail="News not found")
 
-    # generate_post_for_news_task.delay(str(news_id))  # Временно закомментировать
     return {"message": "Generation started (simulated - Celery disabled for testing)"}
 
 

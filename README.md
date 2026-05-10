@@ -42,10 +42,13 @@
 
 ## 📦 Установка
 ### 1. Клонирование репозитория
-git clone <your-repository-url>
+# Переходим в папку для проектов
+cd C:\Users\%USERNAME%\PycharmProjects
+# Клонируем репозиторий
+git clone https://github.com/Delon230685/NewsAggregator.git
+# Переходим в папку проекта
 cd NewsAggregator
 ### 2. Создание виртуального окружения
-powershell
 # Windows
 python -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -53,11 +56,14 @@ python -m venv .venv
 # Linux/Mac
 python3 -m venv .venv
 source .venv/bin/activate
-3. Установка зависимостей
+1. Установка зависимостей
 pip install -r requirements.txt
-4. Настройка переменных окружения
+2. Настройка переменных окружения
 Создайте файл .env в корне проекта
-5. 
+
+# Команда для запуска зависимостей:
+pip install -r requirements.txt
+
 # База данных
 DATABASE_URL=sqlite:///./aibot.db
 

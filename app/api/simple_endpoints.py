@@ -434,9 +434,12 @@ def get_stats(db: Session = Depends(get_db)):
 def health_check(db: Session = Depends(get_db)):
     """Проверка работоспособности API"""
     try:
-        db.execute("SELECT 1")
+        # Для SQLite используем другой запрос
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         db_status = "healthy"
-    except:
+    except Exception as e:
+        print(f"Health check error: {e}")
         db_status = "unhealthy"
 
     return {
@@ -445,7 +448,6 @@ def health_check(db: Session = Depends(get_db)):
         "api_version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat()
     }
-
 
 # ============ Dashboard endpoint ============
 @router.get("/dashboard")

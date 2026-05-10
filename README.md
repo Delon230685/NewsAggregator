@@ -250,7 +250,7 @@ curl "http://localhost:8000/api/sources/"
 # Через API
 curl -X POST "http://localhost:8000/api/parse/lenta"
 
-Запуск:
+Автоматический запуск скрипта:
 python test_parse.py
 
 📁 Структура проекта

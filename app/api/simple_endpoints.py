@@ -1,16 +1,21 @@
+"""API эндпоинты для управления новостями, постами, ключевыми словами и источниками"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy import text, or_, func
+from typing import Optional
 from uuid import UUID
-from datetime import datetime
-from pydantic import BaseModel
+from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models import NewsItem, Post, Source, Keyword, PostStatus, SourceType
+from app.logger import logger
 
-router = APIRouter(prefix="/api", tags=["API"])
+# Импорт схем из schemas.py (если они там определены)
+from pydantic import BaseModel
 
 
+# ============ Pydantic схемы (временные, лучше вынести в schemas.py) ============
 class SourceCreate(BaseModel):
     type: SourceType
     name: str
@@ -76,10 +81,16 @@ class GenerateResponse(BaseModel):
     generated_text: str
 
 
-@router.get("/sources/", response_model=List[SourceResponse])
+# ============ Роутер ============
+router = APIRouter(prefix="/api", tags=["API"])
+
+
+# ============ Sources endpoints ============
+@router.get("/sources/", response_model=list[SourceResponse])
 def get_sources(db: Session = Depends(get_db)):
     """Получить все источники новостей"""
     sources = db.query(Source).all()
+    logger.debug(f"Retrieved {len(sources)} sources")
     return sources
 
 
@@ -90,6 +101,7 @@ def create_source(source: SourceCreate, db: Session = Depends(get_db)):
     db.add(db_source)
     db.commit()
     db.refresh(db_source)
+    logger.info(f"Created source: {source.name} (type: {source.type.value})")
     return db_source
 
 
@@ -105,6 +117,7 @@ def update_source(source_id: UUID, source: SourceCreate, db: Session = Depends(g
 
     db.commit()
     db.refresh(db_source)
+    logger.info(f"Updated source: {source.name}")
     return db_source
 
 
@@ -115,8 +128,10 @@ def delete_source(source_id: UUID, db: Session = Depends(get_db)):
     if not db_source:
         raise HTTPException(status_code=404, detail="Source not found")
 
+    source_name = db_source.name
     db.delete(db_source)
     db.commit()
+    logger.info(f"Deleted source: {source_name}")
     return {"message": "Source deleted successfully"}
 
 
@@ -127,13 +142,16 @@ def parse_source_now(source_id: UUID, db: Session = Depends(get_db)):
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
+    logger.info(f"Manual parsing requested for source: {source.name}")
     return {"message": f"Parsing started for source: {source.name}"}
 
 
-@router.get("/keywords/", response_model=List[KeywordResponse])
+# ============ Keywords endpoints ============
+@router.get("/keywords/", response_model=list[KeywordResponse])
 def get_keywords(db: Session = Depends(get_db)):
     """Получить все ключевые слова для фильтрации"""
     keywords = db.query(Keyword).all()
+    logger.debug(f"Retrieved {len(keywords)} keywords")
     return keywords
 
 
@@ -148,6 +166,7 @@ def create_keyword(keyword: KeywordCreate, db: Session = Depends(get_db)):
     db.add(db_keyword)
     db.commit()
     db.refresh(db_keyword)
+    logger.info(f"Created keyword: {keyword.word}")
     return db_keyword
 
 
@@ -159,13 +178,15 @@ def delete_keyword(keyword_id: str, db: Session = Depends(get_db)):
     if not db_keyword:
         raise HTTPException(status_code=404, detail="Keyword not found")
 
+    keyword_word = db_keyword.word
     db.delete(db_keyword)
     db.commit()
-    return {"message": f"Keyword '{db_keyword.word}' deleted successfully"}
+    logger.info(f"Deleted keyword: {keyword_word}")
+    return {"message": f"Keyword '{keyword_word}' deleted successfully"}
 
 
 @router.put("/keywords/{keyword_id}/toggle")
-def toggle_keyword(keyword_id: UUID, db: Session = Depends(get_db)):
+def toggle_keyword(keyword_id: str, db: Session = Depends(get_db)):
     """Включить/выключить ключевое слово"""
     db_keyword = db.query(Keyword).filter(Keyword.id == keyword_id).first()
     if not db_keyword:
@@ -174,11 +195,13 @@ def toggle_keyword(keyword_id: UUID, db: Session = Depends(get_db)):
     db_keyword.is_active = not db_keyword.is_active
     db.commit()
     db.refresh(db_keyword)
-    return {"message": f"Keyword {'activated' if db_keyword.is_active else 'deactivated'}"}
+    status = "activated" if db_keyword.is_active else "deactivated"
+    logger.info(f"Keyword '{db_keyword.word}' {status}")
+    return {"message": f"Keyword {status}"}
 
 
 @router.post("/keywords/bulk-add")
-def add_keywords_bulk(keywords: List[str], db: Session = Depends(get_db)):
+def add_keywords_bulk(keywords: list[str], db: Session = Depends(get_db)):
     """Добавить несколько ключевых слов сразу"""
     added = []
     existing = []
@@ -193,7 +216,7 @@ def add_keywords_bulk(keywords: List[str], db: Session = Depends(get_db)):
             added.append(word)
 
     db.commit()
-
+    logger.info(f"Bulk added {len(added)} keywords, {len(existing)} already existed")
     return {
         "added": added,
         "existing": existing,
@@ -201,8 +224,14 @@ def add_keywords_bulk(keywords: List[str], db: Session = Depends(get_db)):
     }
 
 
-@router.get("/news/", response_model=List[NewsItemResponse])
-def get_news(skip: int = 0, limit: int = 100, source: Optional[str] = None, db: Session = Depends(get_db)):
+# ============ News endpoints ============
+@router.get("/news/", response_model=list[NewsItemResponse])
+def get_news(
+    skip: int = 0,
+    limit: int = 100,
+    source: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """Получить список новостей с фильтрацией"""
     query = db.query(NewsItem)
 
@@ -210,6 +239,7 @@ def get_news(skip: int = 0, limit: int = 100, source: Optional[str] = None, db: 
         query = query.filter(NewsItem.source == source)
 
     news = query.order_by(NewsItem.published_at.desc()).offset(skip).limit(limit).all()
+    logger.debug(f"Retrieved {len(news)} news items")
     return news
 
 
@@ -234,8 +264,6 @@ def get_latest_news(limit: int = 20, db: Session = Depends(get_db)):
 @router.get("/news/by-keyword/{keyword}")
 def get_news_by_keyword(keyword: str, limit: int = 20, db: Session = Depends(get_db)):
     """Получить новости по ключевому слову"""
-    from sqlalchemy import or_
-
     news = db.query(NewsItem).filter(
         or_(
             NewsItem.title.ilike(f"%{keyword}%"),
@@ -257,6 +285,7 @@ def generate_post_for_news(news_id: str, db: Session = Depends(get_db)):
     if not news:
         raise HTTPException(status_code=404, detail="News not found")
 
+    # Простая генерация без AI для теста
     generated_text = f"""
 🔥 {news.title}
 
@@ -274,12 +303,19 @@ def generate_post_for_news(news_id: str, db: Session = Depends(get_db)):
     )
     db.add(post)
     db.commit()
+    logger.info(f"Generated fallback post for news: {news.title[:50]}...")
 
     return {"message": "Post generated", "post_id": str(post.id)}
 
 
-@router.get("/posts/", response_model=List[PostResponse])
-def get_posts(skip: int = 0, limit: int = 100, status: Optional[PostStatus] = None, db: Session = Depends(get_db)):
+# ============ Posts endpoints ============
+@router.get("/posts/", response_model=list[PostResponse])
+def get_posts(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[PostStatus] = None,
+    db: Session = Depends(get_db)
+):
     """Получить список сгенерированных постов"""
     query = db.query(Post)
 
@@ -287,6 +323,7 @@ def get_posts(skip: int = 0, limit: int = 100, status: Optional[PostStatus] = No
         query = query.filter(Post.status == status)
 
     posts = query.order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+    logger.debug(f"Retrieved {len(posts)} posts")
     return posts
 
 
@@ -312,6 +349,7 @@ def publish_post_manually(post_id: str, db: Session = Depends(get_db)):
     post.status = PostStatus.PUBLISHED
     post.published_at = datetime.utcnow()
     db.commit()
+    logger.info(f"Manually published post: {post_id}")
 
     return {"message": "Post published successfully", "published_at": post.published_at}
 
@@ -325,40 +363,44 @@ def delete_post(post_id: str, db: Session = Depends(get_db)):
 
     db.delete(post)
     db.commit()
+    logger.info(f"Deleted post: {post_id}")
     return {"message": "Post deleted successfully"}
 
 
+# ============ Generate endpoint ============
 @router.post("/generate/", response_model=GenerateResponse)
 async def generate_manually(request: GenerateRequest):
     """Ручная генерация поста через AI"""
     from app.ai.generator import ai_generator
 
     try:
+        logger.info(f"Generating post for: {request.title[:50]}...")
         generated_text = await ai_generator.generate_post(
             title=request.title,
             summary=request.summary
         )
-
         return GenerateResponse(generated_text=generated_text)
 
     except Exception as e:
-        print(f"Generation error: {e}")
-        # Fallback
+        logger.error(f"Generation error: {e}")
         return GenerateResponse(generated_text=f"❌ Ошибка генерации: {str(e)}")
 
 
+# ============ Parse endpoints ============
 @router.post("/parse/lenta")
 def parse_lenta_now(db: Session = Depends(get_db)):
     """Запустить парсинг Lenta.ru прямо сейчас"""
     from app.news_parser.lenta_parser import LentaParser, NewsFilter
 
     try:
+        logger.info("Starting manual Lenta.ru parsing")
         parser = LentaParser()
         news_filter = NewsFilter(db)
 
         all_news = parser.parse_rss()
 
         if not all_news:
+            logger.warning("No news parsed from Lenta.ru")
             return {"status": "error", "message": "No news parsed"}
 
         filtered_news = news_filter.filter_by_keywords(all_news)
@@ -375,6 +417,7 @@ def parse_lenta_now(db: Session = Depends(get_db)):
                 new_news_count += 1
 
         db.commit()
+        logger.info(f"Parsed {len(all_news)} news, filtered {len(filtered_news)}, new {new_news_count}")
 
         return {
             "status": "success",
@@ -384,9 +427,11 @@ def parse_lenta_now(db: Session = Depends(get_db)):
         }
 
     except Exception as e:
+        logger.error(f"Parse error: {e}")
         return {"status": "error", "message": str(e)}
 
 
+# ============ Stats endpoint ============
 @router.get("/stats/")
 def get_stats(db: Session = Depends(get_db)):
     """Получить статистику системы"""
@@ -399,7 +444,6 @@ def get_stats(db: Session = Depends(get_db)):
     total_sources = db.query(Source).count()
     active_keywords = db.query(Keyword).filter(Keyword.is_active == True).count()
 
-    from datetime import timedelta
     yesterday = datetime.utcnow() - timedelta(days=1)
     news_last_24h = db.query(NewsItem).filter(
         NewsItem.published_at >= yesterday
@@ -419,15 +463,16 @@ def get_stats(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+
+# ============ Health endpoint ============
 @router.get("/health")
 def health_check(db: Session = Depends(get_db)):
     """Проверка работоспособности API"""
     try:
-        from sqlalchemy import text
         db.execute(text("SELECT 1"))
         db_status = "healthy"
     except Exception as e:
-        print(f"Health check error: {e}")
+        logger.error(f"Health check error: {e}")
         db_status = "unhealthy"
 
     return {
@@ -437,11 +482,11 @@ def health_check(db: Session = Depends(get_db)):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+
+# ============ Dashboard endpoint ============
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db)):
     """Получить сводку для дашборда"""
-    from sqlalchemy import func
-
     sources_stats = db.query(
         Source.type,
         func.count(Source.id).label('count')

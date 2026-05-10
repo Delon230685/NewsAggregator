@@ -1,29 +1,25 @@
+"""Модели базы данных для SQLAlchemy"""
+
 from sqlalchemy import Column, String, DateTime, Boolean, Text, Enum, Integer, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 import enum
-import sys
+
+from app.logger import logger
 
 Base = declarative_base()
 
 
-def get_uuid_column():
-    """Возвращает подходящий тип для UUID в зависимости от БД"""
-    if 'sqlite' in sys.argv or 'sqlite' in str(sys.argv):
-        return Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    else:
-        return Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-
 class SourceType(str, enum.Enum):
+    """Типы источников новостей"""
     SITE = "site"
     TELEGRAM = "tg"
 
 
 class PostStatus(str, enum.Enum):
+    """Статусы постов"""
     NEW = "new"
     GENERATED = "generated"
     PUBLISHED = "published"
@@ -31,6 +27,7 @@ class PostStatus(str, enum.Enum):
 
 
 class ParsingStatus(str, enum.Enum):
+    """Статусы парсинга"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -38,7 +35,9 @@ class ParsingStatus(str, enum.Enum):
 
 
 class NewsItem(Base):
+    """Модель новостей"""
     __tablename__ = "news_items"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String(500), nullable=False)
@@ -62,7 +61,9 @@ class NewsItem(Base):
 
 
 class Post(Base):
+    """Модель сгенерированных постов"""
     __tablename__ = "posts"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     news_id = Column(String(36), ForeignKey('news_items.id', ondelete='CASCADE'), nullable=False)
@@ -74,7 +75,6 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Отношения
     news = relationship("NewsItem", back_populates="posts")
 
     __table_args__ = (
@@ -85,7 +85,9 @@ class Post(Base):
 
 
 class Source(Base):
+    """Модель источников новостей"""
     __tablename__ = "sources"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     type = Column(Enum(SourceType), nullable=False)
@@ -105,7 +107,9 @@ class Source(Base):
 
 
 class Keyword(Base):
+    """Модель ключевых слов для фильтрации"""
     __tablename__ = "keywords"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     word = Column(String(100), unique=True, nullable=False, index=True)
@@ -118,7 +122,9 @@ class Keyword(Base):
 
 
 class ParsingLog(Base):
+    """Модель логов парсинга"""
     __tablename__ = "parsing_logs"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     source_id = Column(String(36), ForeignKey('sources.id', ondelete='SET NULL'))
@@ -136,7 +142,9 @@ class ParsingLog(Base):
 
 
 class GenerationLog(Base):
+    """Модель логов генерации постов"""
     __tablename__ = "generation_logs"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     news_id = Column(String(36), ForeignKey('news_items.id', ondelete='SET NULL'))
@@ -158,7 +166,9 @@ class GenerationLog(Base):
 
 
 class ScheduledTask(Base):
+    """Модель запланированных задач"""
     __tablename__ = "scheduled_tasks"
+    __allow_unmapped__ = True
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_name = Column(String(100), nullable=False)

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.simple_endpoints import router
 from app.database import db
 from app.config import config
+from app.logger import logger
 
 app = FastAPI(
     title=config.APP_NAME + " - API Documentation",
@@ -22,8 +23,10 @@ app.add_middleware(
 
 app.include_router(router)
 
+
 @app.get("/")
-async def root():
+async def root() -> dict[str, str | dict[str, str]]:
+    """Корневой эндпоинт с информацией о доступных API"""
     return {
         "message": f"Welcome to {config.APP_NAME}",
         "docs": "/docs",
@@ -40,19 +43,42 @@ async def root():
         "status": "running"
     }
 
+
 @app.on_event("startup")
-async def startup_event():
-    # Создание таблиц в БД
+async def startup_event() -> None:
+    """Действия при запуске приложения"""
     db.create_tables()
-    print(f"{config.APP_NAME} started successfully!")
-    print(f"Swagger UI: http://localhost:8000/docs")
-    print(f"ReDoc: http://localhost:8000/redoc")
+    logger.info(f"{config.APP_NAME} started successfully!")
+    logger.info(f"Swagger UI: http://localhost:8000/docs")
+    logger.info(f"ReDoc: http://localhost:8000/redoc")
+
+    if config.DEBUG:
+        logger.debug("Running in DEBUG mode")
+        openai_config = config.get_openai_config()
+        if openai_config["is_configured"]:
+            logger.info(f"OpenAI configured with model: {openai_config['model']}")
+        else:
+            logger.warning("OpenAI API key not configured, using fallback generation")
+
+        telegram_config = config.get_telegram_config()
+        if telegram_config["is_configured"]:
+            logger.info("Telegram bot configured")
+        else:
+            logger.warning("Telegram not configured, publishing disabled")
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Действия при остановке приложения"""
+    logger.info(f"{config.APP_NAME} shutting down...")
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=config.DEBUG
     )

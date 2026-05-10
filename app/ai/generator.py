@@ -1,6 +1,7 @@
 from app.ai.openai_client import openai_client
 from typing import Optional
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -10,15 +11,9 @@ class AIGenerator:
         self.client = openai_client
 
     async def generate_post(self, title: str, summary: str, style: str = "casual") -> Optional[str]:
-        """
-        Генерация поста для Telegram с использованием OpenAI клиента
-        """
+        """Генерация поста через OpenAI"""
         try:
-            # Временно используем fallback для тестов
-            # Если нет API ключа, используем генерацию без AI
-            if not self.client.client.api_key or self.client.client.api_key == "test_key":
-                return self._fallback_generation(title, summary)
-
+            # Пробуем реальную генерацию
             generated_text = await self.client.generate_post(
                 title=title,
                 content=summary,
@@ -29,6 +24,7 @@ class AIGenerator:
             )
 
             if generated_text:
+                logger.info(f"AI generated post for: {title[:50]}")
                 return generated_text
             else:
                 return self._fallback_generation(title, summary)
@@ -38,23 +34,22 @@ class AIGenerator:
             return self._fallback_generation(title, summary)
 
     def _fallback_generation(self, title: str, summary: str) -> str:
-        """Fallback генерация без AI"""
-        import random
-
+        """Fallback если API недоступен"""
         emojis = ["🔥", "💡", "📰", "🤯", "⚡️", "🎯", "💎", "🌟"]
-        emoji = random.choice(emojis)
-
-        # Берем первое предложение
-        first_sentence = summary.split('.')[0] if summary else ""
+        cta_variants = [
+            "✨ Присоединяйтесь к нашему Telegram-каналу!",
+            "👉 Подпишитесь, чтобы узнавать первыми!",
+            "💬 Напишите своё мнение в комментариях!"
+        ]
 
         return f"""
-{emoji} *{title}*
+{random.choice(emojis)} {title}
 
-{first_sentence}{'...' if len(first_sentence) < len(summary) else ''}
+{summary[:300]}...
 
-👉 Узнайте больше по ссылке
+{random.choice(cta_variants)}
 
-#новости #актуально #{title.split()[0] if title else 'новость'}
+#новости #актуально
         """.strip()
 
 

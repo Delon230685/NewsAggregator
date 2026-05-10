@@ -338,22 +338,20 @@ def delete_post(post_id: str, db: Session = Depends(get_db)):
 @router.post("/generate/", response_model=GenerateResponse)
 async def generate_manually(request: GenerateRequest):
     """Ручная генерация поста через AI"""
-    import random
+    from app.ai.generator import ai_generator
 
-    emojis = ["🔥", "💡", "📰", "🤯", "⚡️", "🎯"]
-    emoji = random.choice(emojis)
+    try:
+        generated_text = await ai_generator.generate_post(
+            title=request.title,
+            summary=request.summary
+        )
 
-    generated_text = f"""
-{emoji} {request.title}
+        return GenerateResponse(generated_text=generated_text)
 
-{request.summary[:300]}...
-
-✨ Присоединяйтесь к нашему Telegram-каналу, чтобы быть в курсе!
-
-#новости #актуально
-    """.strip()
-
-    return GenerateResponse(generated_text=generated_text)
+    except Exception as e:
+        print(f"Generation error: {e}")
+        # Fallback
+        return GenerateResponse(generated_text=f"❌ Ошибка генерации: {str(e)}")
 
 
 # ============ Parse endpoints ============

@@ -17,8 +17,6 @@
 - [🧪 Проверка работоспособности](#-проверка-работоспособности)
 - [📊 Мониторинг](#-мониторинг)
 - [🐛 Известные ограничения](#-известные-ограничения)
-- [🚧 Планы по улучшению](#-планы-по-улучшению)
-- [📄 Лицензия](#-лицензия)
 
 ## ✨ Возможности
 
@@ -43,12 +41,10 @@
 - **Uvicorn** - ASGI сервер
 
 ## 📦 Установка
-
 ### 1. Клонирование репозитория
-
 git clone <your-repository-url>
 cd NewsAggregator
-2. Создание виртуального окружения
+### 2. Создание виртуального окружения
 powershell
 # Windows
 python -m venv .venv
@@ -58,12 +54,10 @@ python -m venv .venv
 python3 -m venv .venv
 source .venv/bin/activate
 3. Установка зависимостей
-bash
 pip install -r requirements.txt
 4. Настройка переменных окружения
-Создайте файл .env в корне проекта:
-
-env
+Создайте файл .env в корне проекта
+5. 
 # База данных
 DATABASE_URL=sqlite:///./aibot.db
 
@@ -86,19 +80,15 @@ TELEGRAM_CHANNEL_ID=@test_channel
 DEBUG=True
 🚀 Запуск
 Быстрый запуск (только API)
-bash
 uvicorn app.main:app --reload
 После запуска откройте в браузере:
 
 Swagger UI: http://localhost:8000/docs
-
 ReDoc: http://localhost:8000/redoc
-
 API Root: http://localhost:8000/
 
 Полный запуск (API + Celery + Redis)
 1. Запустите Redis (через Docker)
-powershell
 # Запуск Redis контейнера
 docker run -d -p 6379:6379 --name redis redis
 
@@ -116,19 +106,15 @@ docker start redis
 
 # Удаление контейнера Redis
 docker rm redis
+
 2. Запустите FastAPI сервер (Terminal 1)
-bash
 uvicorn app.main:app --reload
 3. Запустите Celery worker (Terminal 2)
-bash
 celery -A app.tasks worker --loglevel=info --pool=solo
 4. Запустите Celery beat (Terminal 3)
-bash
 celery -A app.tasks beat --loglevel=info
 Запуск всех сервисов одной командой (Windows PowerShell)
 Создайте файл start_all.ps1:
-
-powershell
 # start_all.ps1
 Write-Host "Starting all services..." -ForegroundColor Green
 
@@ -146,13 +132,9 @@ if (-not $redisRunning) {
 Write-Host "Starting FastAPI..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .venv\Scripts\Activate; uvicorn app.main:app --reload --port 8000"
 
-Start-Sleep -Seconds 3
-
 # Запускаем Celery worker
 Write-Host "Starting Celery worker..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .venv\Scripts\Activate; celery -A app.tasks worker --loglevel=info --pool=solo"
-
-Start-Sleep -Seconds 2
 
 # Запускаем Celery beat
 Write-Host "Starting Celery beat..." -ForegroundColor Yellow
@@ -162,9 +144,8 @@ Write-Host "`n✅ All services started!" -ForegroundColor Green
 Write-Host "📚 Swagger UI: http://localhost:8000/docs" -ForegroundColor Cyan
 Write-Host "🐳 Redis: localhost:6379" -ForegroundColor Cyan
 Запустите:
-
-powershell
 .\start_all.ps1
+
 📚 API Эндпоинты
 Управление источниками
 Метод	Эндпоинт	Описание
@@ -202,9 +183,9 @@ POST	/api/generate/	Ручная генерация поста
 GET	/api/stats/	Статистика системы
 GET	/api/health	Проверка здоровья
 GET	/api/dashboard	Дашборд
+
 🔍 Примеры запросов
 Добавление ключевых слов
-bash
 # Через curl
 curl -X POST "http://localhost:8000/api/keywords/" -H "Content-Type: application/json" -d "{\"word\": \"Россия\"}"
 curl -X POST "http://localhost:8000/api/keywords/" -H "Content-Type: application/json" -d "{\"word\": \"технологии\"}"
@@ -225,7 +206,6 @@ curl -X POST "http://localhost:8000/api/parse/lenta"
 #   "new_news": 3
 # }
 Просмотр данных
-bash
 # Статистика системы
 curl "http://localhost:8000/api/stats/"
 
@@ -246,38 +226,29 @@ curl "http://localhost:8000/api/dashboard"
 
 # Проверка здоровья
 curl "http://localhost:8000/api/health"
+
 Генерация поста
-bash
 # Ручная генерация
 curl -X POST "http://localhost:8000/api/generate/" -H "Content-Type: application/json" -d "{\"title\": \"Новая технология AI\", \"summary\": \"Ученые разработали новую нейросеть, которая способна генерировать видео по текстовому описанию\"}"
 Управление источниками
-bash
 # Создать источник
 curl -X POST "http://localhost:8000/api/sources/" -H "Content-Type: application/json" -d "{\"type\": \"site\", \"name\": \"Lenta.ru\", \"url\": \"https://lenta.ru\", \"enabled\": true}"
 
 # Получить все источники
 curl "http://localhost:8000/api/sources/"
 🌐 Парсинг Lenta.ru
-Как это работает
 Парсинг RSS: Система парсит RSS-ленту Lenta.ru (https://lenta.ru/rss)
-
 Фильтрация: Новости фильтруются по ключевым словам из базы данных
-
 Сохранение: Релевантные новости сохраняются в базу данных
-
 Генерация: Для каждой новости автоматически генерируется пост
 
-Автоматический парсинг
+# Автоматический парсинг
 С Celery Beat парсинг запускается автоматически:
-
 ⏰ Каждые 30 минут - парсинг Lenta.ru
-
 ⏰ Каждые 10 минут - генерация постов для новых новостей
-
 ⏰ Каждый день в полночь - очистка старых логов
 
-Ручной парсинг
-bash
+# Ручной парсинг
 # Через API
 curl -X POST "http://localhost:8000/api/parse/lenta"
 
@@ -285,8 +256,6 @@ curl -X POST "http://localhost:8000/api/parse/lenta"
 python -c "from app.tasks import parse_lenta_by_keywords; print(parse_lenta_by_keywords.delay().get())"
 Тестирование парсинга
 Создайте файл test_parse.py:
-
-python
 """Тестовый скрипт для парсинга Lenta.ru"""
 import sys
 import os
@@ -317,12 +286,11 @@ def test_parse():
 
 if __name__ == "__main__":
     test_parse()
-Запуск:
 
-bash
+Запуск:
 python test_parse.py
+
 📁 Структура проекта
-text
 NewsAggregator/
 ├── app/
 │   ├── __init__.py
@@ -349,25 +317,23 @@ NewsAggregator/
 ├── start_all.ps1               # Скрипт запуска (Windows)
 ├── test_parse.py               # Тестовый скрипт
 └── README.md                   # Документация
+
 🔧 Устранение проблем
 Ошибка: NameError: name 'router' is not defined
 Решение: Убедитесь, что в файле app/api/simple_endpoints.py есть строка:
 
-python
 router = APIRouter(prefix="/api", tags=["API"])
 Ошибка: ValueError: invalid literal for int()
 Решение: Проверьте файл .env, убедитесь что TELEGRAM_API_ID содержит число:
 
-env
+# env:
 TELEGRAM_API_ID=12345
 Ошибка: sqlalchemy.exc.CompileError с UUID
 Решение: Используйте SQLite с String(36) вместо UUID или переключитесь на PostgreSQL.
 
-Redis не запускается
-powershell
+## Redis не запускается
 # Проверьте статус Docker
 docker ps
-
 # Если Docker не запущен - запустите Docker Desktop
 
 # Перезапустите Redis
@@ -375,42 +341,32 @@ docker stop redis
 docker rm redis
 docker run -d -p 6379:6379 --name redis redis
 Celery не подключается к Redis
-bash
 # Проверьте подключение
 python -c "import redis; r = redis.Redis(host='localhost', port=6379); print(r.ping())"
-
 # Должно вернуть True
 Порт 8000 уже занят
-bash
 # Windows
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
-
 # Linux/Mac
 lsof -i :8000
 kill -9 <PID>
-База данных не создается
-Файл .env должен содержать:
 
-env
+## Файл .env должен содержать:
 DATABASE_URL=sqlite:///./aibot.db
 DEBUG=True
 Приложение автоматически создаст таблицы при первом запуске.
 
 🧪 Проверка работоспособности
 1. Проверка API
-bash
 curl http://localhost:8000/
 # Ожидаемый ответ: {"message":"Welcome to AI News Bot","docs":"/docs","status":"running"}
 2. Проверка здоровья
-bash
 curl http://localhost:8000/api/health
 # Ожидаемый ответ: {"status":"ok","database":"healthy","api_version":"1.0.0"}
 3. Проверка Celery (если запущен)
-bash
 python -c "from app.tasks import test_celery; print(test_celery.delay().get(timeout=10))"
 4. Проверка парсинга
-bash
 # Добавить тестовое ключевое слово
 curl -X POST "http://localhost:8000/api/keywords/" -H "Content-Type: application/json" -d "{\"word\": \"новости\"}"
 
@@ -419,57 +375,34 @@ curl -X POST "http://localhost:8000/api/parse/lenta"
 
 # Проверить результат
 curl "http://localhost:8000/api/stats/"
+
 📊 Мониторинг
-Просмотр логов
-bash
-# Логи FastAPI (в терминале с uvicorn)
-# Логи Celery (в терминалах worker и beat)
-# Логи Redis
+# Просмотр логов
+Логи FastAPI (в терминале с uvicorn)
+Логи Celery (в терминалах worker и beat)
+Логи Redis
 docker logs redis
-Просмотр данных в БД
-bash
-# Установите SQLite Browser
-# Или через командную строку
+
+# Просмотр данных в БД
+Установите SQLite Browser
+Или через командную строку:
 sqlite3 aibot.db
 .tables
 SELECT * FROM news_items LIMIT 5;
 SELECT * FROM keywords;
 .quit
+
 🐛 Известные ограничения
 SQLite не поддерживает UUID, используются String(36)
-
 Redis в Windows требует Docker или WSL2
-
 OpenAI API требует валидный ключ для реальной генерации
-
 Telegram бот требует настройки для публикации
-
-🚧 Планы по улучшению
-Добавить больше источников новостей
-
-Подключить PostgreSQL для продакшена
-
-Настроить реальную публикацию в Telegram
-
-Добавить веб-интерфейс администратора
-
-Настроить мониторинг через Prometheus/Grafana
-
-Добавить кэширование через Redis
-
-Улучшить AI генерацию с разными стилями
 
 📄 Лицензия
 MIT
 
-👥 Контакты
-По всем вопросам обращайтесь к разработчику.
-
 ✅ Проект успешно запущен и работает!
 📚 Swagger UI: http://localhost:8000/docs
-
 🏠 API Root: http://localhost:8000/
-
 📖 ReDoc: http://localhost:8000/redoc
-
-Спасибо за использование нашего сервиса! 🎉
+Спасибо за использование сервиса! 🎉
